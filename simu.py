@@ -9,8 +9,6 @@ from scipy.integrate import ode
 import matplotlib.pyplot as plt
 import time
 import pickle
-import matplotlib.ticker
-import multiprocessing  
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -20,8 +18,8 @@ def timeit(method):
             name = kw.get('log_name', method.__name__.upper())
             kw['log_time'][name] = int((te - ts) * 1000)
         else:
-            print '%r  %2.2f ms' % \
-                  (method.__name__, (te - ts) * 1000)
+            print('%r  %2.2f ms' % \
+                  (method.__name__, (te - ts) * 1000))
         return result
     return timed
 
@@ -48,8 +46,8 @@ def get_B(eps1,eps2,a,varphi,E,alpha):
 	
 class OnlyOne:
     """singleton, contain a dictionary with already computed simulation"""
-    pathi='alpha{}.dict_{}'
-    patho='alpha{}.dict_{}'
+    pathi='res/alpha{}.dict_{}'
+    patho='res/alpha{}.dict_{}'
     #pathi='dict_{}'.format(dt)
     #patho='dict_{}'.format(dt)
     class __OnlyOne:
@@ -59,6 +57,7 @@ class OnlyOne:
             try:
                 with open(OnlyOne.pathi.format(alpha,dt), 'rb') as fp:
                     self.val = pickle.load(fp)
+                    print('opening '+OnlyOne.pathi.format(alpha,dt))
             except IOError:
                 print('not existing file')
                 self.val={}
@@ -91,8 +90,8 @@ class integrator():
         self.nocomputation=nocomputation
         self.force_computation=force_computation
         a = lambda t : (1-np.cos(t))
-        #u2 = lambda t : -3 *np.cos(t/2)
-        varphi= lambda t: -6 * np.sin(t/2) # primitive of u2 such as varphi(0)=0
+        #u2 = lambda t : -1 *np.cos(t/2)
+        varphi= lambda t: -2 * np.sin(t/2) # primitive of u2 such as varphi(0)=0
         self.tf = 2*np.pi/(eps1*eps2)
         self.A=get_A(eps1,eps2,a,varphi,E,alpha)
         self.B=get_B(eps1,eps2,a,varphi,E,alpha)
@@ -188,10 +187,13 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     Z6=np.zeros(X.shape)
     for j in range(len(leps2)-1):
         for i in range(len(leps1)-1):
-            print(2**(-leps1[i]),2**(-leps2[j]))
+            #print(2**(-leps1[i]),2**(-leps2[j]))
+            print(leps1[i],leps2[j])
             inte=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,nocomputation=nocomputation,force_computation=force_computation)
+            print(inte.complex(dt,method))
             Z1[j,i]=-np.log2(1+inte.complex(dt,method)[2])# wierd convention
             Z2[j,i]=-np.log2(np.abs(inte.complex(dt,method)[2]-inte.real(dt,method))[2])# wierd convention
+            #Z2[j,i]=-np.log2(np.linalg.norm(inte.complex(dt,method)-inte.real(dt,method)))# wierd convention
             Z3[j,i]=-np.log2(1+inte.real(dt,method)[2])
             Z6[j,i]=-np.log2(np.abs(1-np.linalg.norm(inte.complex(dt,method)))+np.abs(1-np.linalg.norm(inte.real(dt,method))))
             Z4[j,i]=0 if (i==0 and j==0)else -np.log2(1+inte.real(dt,method)[2])/(leps1[i]+leps2[j])
@@ -199,7 +201,7 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     #print(X,Y,Z)
     fig, axs = plt.subplots(3, 2)
     z_min=0
-    z_max=20
+    z_max=35
     #levels = matplotlib.ticker.MaxNLocator(nbins=15).tick_values(z_min, z_max)
     ax = axs[0, 0]
     #c = ax.contourf(X, Y, Z1, cmap='jet', levels=levels)
@@ -212,7 +214,7 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     ax = axs[0, 1]
     ax.set(ylim=(0, np.max(leps1)))
     c = ax.pcolormesh(X,Y,Z2, cmap='jet', vmin=z_min, vmax=z_max)
-    line=ax.plot(leps1,2*np.array(leps1),'red',linestyle=':',label='eps1^2=eps2',linewidth=3)
+    line=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^3=eps2',linewidth=3)
     first_legend = ax.legend(handles=line, loc='lower right')
     ax.set_title('RWA error')
     fig.colorbar(c, ax=ax)
@@ -223,15 +225,15 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     ax.set_title('Total error')
     fig.colorbar(c, ax=ax)
     line3=ax.plot(leps1,leps1,'red',linestyle='--',label='eps1/eps2=1')
-    line4=ax.plot(leps1,2*np.array(leps1),'red',linestyle=':',label='eps1^2=eps2',linewidth=3)
+    line4=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^2=eps2',linewidth=3)
     
     ax = axs[1, 1]
-    c = ax.pcolormesh(X,Y,Z4, cmap='jet', vmin=-1, vmax=2)
+    c = ax.pcolormesh(X,Y,Z4, cmap='jet', vmin=-1, vmax=8)
     ax.set_title('alpha real convergence rate T^-alpha')
     fig.colorbar(c, ax=ax)
     
     ax = axs[2, 1]
-    c = ax.pcolormesh(X,Y,Z5, cmap='jet', vmin=-1, vmax=6)
+    c = ax.pcolormesh(X,Y,Z5, cmap='jet', vmin=-1, vmax=8)
     ax.set_title('alpha complex convergence rate T^-alpha')
     fig.colorbar(c, ax=ax)
     
