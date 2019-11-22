@@ -43,6 +43,16 @@ def get_B(eps1,eps2,a,varphi,E,alpha):
     return lambda t: np.array([[0,-2*(E+alpha),2*u2(t)],
                 [2*(E+alpha),0,-2*u1(t)],
                 [-2*u2(t),2*u1(t),0]])
+def get_C(eps1,eps2,a,varphi,E,alpha):
+    def beta(t):
+        return 1.#/()
+    def u1(t):
+        return 0.5*eps1*a(eps1*eps2*t)*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
+    def u2(t):
+        return 0.5*eps1*a(eps1*eps2*t)*np.sin(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
+    return lambda t: np.array([[0,-2*(E+alpha),2*u2(t)],
+                [2*(E+alpha),0,-2*u1(t)],
+                [-2*u2(t),2*u1(t),0]])
 	
 class OnlyOne:
     """singleton, contain a dictionary with already computed simulation"""
@@ -95,6 +105,7 @@ class integrator():
         self.tf = 2*np.pi/(eps1*eps2)
         self.A=get_A(eps1,eps2,a,varphi,E,alpha)
         self.B=get_B(eps1,eps2,a,varphi,E,alpha)
+        self.C=get_C(eps1,eps2,a,varphi,E,alpha)
         self.H=get_H(eps1,eps2,a,varphi,E,alpha)
         self.alpha=alpha
     
@@ -119,6 +130,33 @@ class integrator():
             psi=psi/np.linalg.norm(psi)
             if verbose:
                 print(step,nbstep,psi)
+        return psi
+    def real_RWA(self,dt,method):
+        eps1=self.eps1
+        eps2=self.eps2
+        sigleton_dict=OnlyOne(dt,self.alpha)
+        dic=sigleton_dict.instance.val
+        if dic.has_key((eps1,eps2,'ra')) and self.force_computation==False:
+            psi=dic[(eps1,eps2,'ra')]
+        elif self.nocomputation:
+            return np.array([0,0,0])
+        else:
+            def F(t,x):
+                return np.dot(self.C(t),x)
+            def jac(t, y):
+                return self.C(t)
+            v0=np.array([0,0,1])
+            r = ode(F, jac).set_integrator(method)
+            r.set_initial_value(v0, 0)
+            while r.successful() and r.t < self.tf:
+                r.integrate(min(r.t+dt,self.tf))
+                #print(r.t, r.y)
+            #print(r.successful())
+            if r.successful():
+                psi=r.y
+                sigleton_dict.add((eps1,eps2,'ra'),psi)
+            else :
+                raise Exception('simulation was not successful')
         return psi
     @timeit
     def real(self,dt,method):
@@ -178,7 +216,7 @@ class integrator():
         return psi
 def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     method='dopri5'
-    X, Y = np.meshgrid(leps1, leps2)
+    X, Y = np.meshgrid(leps1, np.array(leps2))
     Z1=np.zeros(X.shape)
     Z2=np.zeros(X.shape)
     Z3=np.zeros(X.shape)
@@ -206,26 +244,26 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     ax = axs[0, 0]
     #c = ax.contourf(X, Y, Z1, cmap='jet', levels=levels)
     c = ax.pcolormesh(X,Y,Z1, cmap='jet')#, vmin=z_min, vmax=z_max)
-    line=ax.plot(leps1,leps1,'red',linestyle='--',label='eps2/eps1=1')
-    first_legend = ax.legend(handles=line, loc='lower right')
+    #line=ax.plot(leps1,leps1,'red',linestyle='--',label='eps2/eps1=1')
+    #first_legend = ax.legend(handles=line, loc='lower right')
     ax.set_title('adiabatic error')
     fig.colorbar(c, ax=ax)
     
     ax = axs[0, 1]
-    ax.set(ylim=(0, np.max(leps1)))
+    #ax.set(ylim=(0, np.max(leps1)))
     c = ax.pcolormesh(X,Y,Z2, cmap='jet', vmin=z_min, vmax=z_max)
-    line=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^3=eps2',linewidth=3)
-    first_legend = ax.legend(handles=line, loc='lower right')
+    #line=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^3=eps2',linewidth=3)
+    #first_legend = ax.legend(handles=line, loc='lower right')
     ax.set_title('RWA error')
     fig.colorbar(c, ax=ax)
     
     ax = axs[1, 0]
     c = ax.pcolormesh(X,Y,Z3, cmap='jet', vmin=z_min, vmax=z_max)
-    ax.set(ylim=(0, np.max(leps1)))
+    #ax.set(ylim=(0, np.max(leps1)))
     ax.set_title('Total error')
     fig.colorbar(c, ax=ax)
-    line3=ax.plot(leps1,leps1,'red',linestyle='--',label='eps1/eps2=1')
-    line4=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^2=eps2',linewidth=3)
+    #line3=ax.plot(leps1,leps1,'red',linestyle='--',label='eps1/eps2=1')
+    #line4=ax.plot(leps1,3*np.array(leps1),'red',linestyle=':',label='eps1^2=eps2',linewidth=3)
     
     ax = axs[1, 1]
     c = ax.pcolormesh(X,Y,Z4, cmap='jet', vmin=-1, vmax=8)
