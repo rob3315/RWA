@@ -4,64 +4,95 @@ Created on Fri Nov 22 15:35:53 2019
 
 @author: robin
 """
+import sympy
 import numpy as np
 class Abstract_factor():
-    def __init__(self,C):
-        self.C=np.array(C,dtype=np.int)
+    def __init__(self,coef_freq):
+        self.coef_freq=np.array(coef_freq,dtype=np.int)
         self.type=''
+        self.front_coeff=1
+        self.table={'A':A,'B':B,'C':C,'D':D}
     def __str__(self):
-        return "{}({}E1+{}E_2)".format(self.type,self.C[0],self.C[1])
+        return "{}({}E1+{}E_2)".format(self.type,self.coef_freq[0],self.coef_freq[1])
     def __mul__(self,other):
         pass
+    def __add__(self,other):
+        if isinstance(other,Abstract_factor):
+            if self.type==other.type and self.coef_freq==other.coef_freq:
+                res=self.table[self.type](self.coef_freq)
+                res.front_coeff=self.front_coeff+other.front_coeff
+            else : raise Exception("cannot add {}+{}".format(self,other))
+        else : raise Exception("unable to add non Abstract_factor")
+    def __rmul__(self,other):
+        """scalar multiplication"""
+        res=(self.table[self.type])(self.coef_freq)
+        res.front_coeff=other*self.front_coeff
+        return res
     def copy(self):
         table={'A':A,'B':B,'C':C,'D':D}
-        return table[self.type](self.C)
+        return self.front_coeff*table[self.type](self.coef_freq)
     def __eq__(self,other):
         if isinstance(other,Abstract_factor):
-            return (self.type==other.type and self.C[0]==other.C[0] and self.C[1]==other.C[1])
+            return (self.type==other.type and self.coef_freq[0]==other.coef_freq[0] and self.coef_freq[1]==other.coef_freq[1])
         else :
             raise Exception('unable to compare')
+    def shape(self): pass
+    def get_value(self,VE_1,VE_2):
+        E=VE_1*self.coef_freq[0]+VE_2*self.coef_freq[1]
+        return self.front_coeff*self.shape()(E)
 class A(Abstract_factor):
-    def __init__(self,C):
-        Abstract_factor.__init__(self,C)
+    def __init__(self,coef_freq):
+        Abstract_factor.__init__(self,coef_freq)
         self.type='A'
     def primi(self):
-        return(B(self.C))
+        return(B(self.coef_freq))
     def __mul__(self,other):
         if isinstance(other,Abstract_factor):
             table={'A':C,'B':D,'C':A,'D':B}
-            return table[other.type](self.C-other.C)
+            front_coeff={'A':1,'B':1,'C':1,'D':1}
+            return self.front_coeff*other.front_coeff*front_coeff[other.type]*table[other.type](self.coef_freq-other.coef_freq)
+    def shape(self):
+        return lambda E: np.array([[0,np.exp(1j*E)],[np.exp(-1j*E),0]])
 
 class B(Abstract_factor):
-    def __init__(self,C):
-        Abstract_factor.__init__(self,C)
+    def __init__(self,coef_freq):
+        Abstract_factor.__init__(self,coef_freq)
         self.type='B'
     def primi(self):
-        return(A(self.C))
+        return(A(self.coef_freq))
     def __mul__(self,other):
         if isinstance(other,Abstract_factor):
             table={'A':D,'B':C,'C':B,'D':A}
-            return table[other.type](self.C-other.C)
+            front_coeff={'A':1,'B':1,'C':1,'D':1}
+            return self.front_coeff*other.front_coeff*front_coeff[other.type]*table[other.type](self.coef_freq-other.coef_freq)
+    def shape(self):
+        return lambda E: np.array([[0,-1j*np.exp(1j*E)],[1j*np.exp(-1j*E),0]])
 class C(Abstract_factor):
-    def __init__(self,C):
-        Abstract_factor.__init__(self,C)
+    def __init__(self,coef_freq):
+        Abstract_factor.__init__(self,coef_freq)
         self.type='C'
     def primi(self):
-        return(D(self.C))
+        return(D(self.coef_freq))
     def __mul__(self,other):
         if isinstance(other,Abstract_factor):
             table={'A':A,'B':B,'C':C,'D':D}
-            return table[other.type](self.C+other.C)
+            front_coeff={'A':1,'B':1,'C':1,'D':1}
+            return self.front_coeff*other.front_coeff*front_coeff[other.type]*table[other.type](self.coef_freq+other.coef_freq)
+    def shape(self):
+        return lambda E: np.array([[np.exp(1j*E),0],[0,np.exp(-1j*E)]])
 class D(Abstract_factor):
-    def __init__(self,C):
-        Abstract_factor.__init__(self,C)
+    def __init__(self,coef_freq):
+        Abstract_factor.__init__(self,coef_freq)
         self.type='D'
     def primi(self):
-        return(C(self.C))
+        return(C(self.coef_freq))
     def __mul__(self,other):
         if isinstance(other,Abstract_factor):
             table={'A':B,'B':A,'C':D,'D':C}
-            return table[other.type](self.C+other.C)
+            front_coeff={'A':1,'B':1,'C':1,'D':1}
+            return self.front_coeff*other.front_coeff*front_coeff[other.type]*table[other.type](self.coef_freq+other.coef_freq)
+    def shape(self):
+        return lambda E: np.array([[-1j*np.exp(1j*E),0],[0,1j*np.exp(-1j*E)]])
     
 class Hamiltonian():
     def __init__(self,n,m):
@@ -123,20 +154,22 @@ class Hamiltonian():
         del self.coeff[i,j][k]# we delete X
         #print(self)
         Z=Y.copy()
+        print(Z)
         for order in range(1,self.n//i):
             self.add_right_mult(i*order,j,Z) # the expension of (I+i eps/f_x Y)^-1
             Z=Z*X
     def clean_order(self,i,j):
+        """clean the coefficientall s of frequency containing f_2 in front of eps_1^i eps_2^j"""
         def oscillation(lst):
             """return the first element with E_2"""
             for k in range(len(lst)):
-                if lst[k].C[1]!=0 :
+                if lst[k].coef_freq[1]!=0 :
                     return k
             return -1
         while oscillation(self.coeff[i,j])!=-1:
             k=oscillation(self.coeff[i,j])
             #print('cleaning term {}'.format(str(self.coeff[i,j][k])))
-            self.freq_deleted.add((self.coeff[i,j][k].C[0],self.coeff[i,j][k].C[1]))
+            self.freq_deleted.add((self.coeff[i,j][k].coef_freq[0],self.coeff[i,j][k].coef_freq[1]))
             self.apply_RWA(i,j,k)
             
             
@@ -145,15 +178,14 @@ class Hamiltonian():
         
         
         
-        
-n=35
-H=Hamiltonian(n,2)
-H.coeff[1,0]=[A((1,0)),A((0,1))]
-for k in range(n):
-    H.clean_order(k,0)
-    print(k)
-for k in range(n):
-    H.clean_order(k,1)
-print(H.freq_deleted)
-#print(H)
-        
+if __name__ == "__main__":    
+    n=10
+    H=Hamiltonian(n,2)
+    H.coeff[1,0]=[A((1,0)),A((0,1))]
+    for k in range(n):
+        H.clean_order(k,0)
+        print(k)
+    for k in range(n):
+        H.clean_order(k,1)
+    print(H.freq_deleted)
+    print(H)
