@@ -7,6 +7,7 @@ Created on Fri Nov 22 15:35:53 2019
 #import sympy
 import numpy as np
 import time
+import sympy
 def timeit(method):
     def timed(*args, **kw):
         ts = time.time()
@@ -179,17 +180,21 @@ class Hamiltonian():
     def apply_RWA(self,i,j,k):
         X=self.coeff[i,j][k] # the term we want to eliminate
         Y=X.primi() #we applie the change of variable (I+ieps_1/f_X Y)
-        self.add_left_mult(i,j,1j*Y)# the term in ieps_1/f_X Y H
-        self.add_elt(i+1,j+1,-1*Y.copy())# the slow term
+        if X.coef_freq[1]>=0:
+            g_X=sympy.Symbol('g_{}{}'.format(X.coef_freq[0],X.coef_freq[1]))#g_ij =1/(if_1+jf_2)
+        else:
+            g_X=-sympy.Symbol('g_{}{}'.format(-X.coef_freq[0],-X.coef_freq[1]))#g_ij =1/(if_1+jf_2)
+        self.add_left_mult(i,j,1j*g_X*Y)# the term in ieps_1/f_X Y H
+        self.add_elt(i+1,j+1,-1*Y.copy())# the slow term TODO prefacteur
         self.add_elt(i,j,-1*X.copy())
         #print(self)
         #del self.coeff[i,j][k]# we delete X
         #print(self)
-        Z=-1j*Y.copy()
+        Z=(-1j*g_X)*Y.copy()
         lstH=[]
         for order in range(1,self.n//i):
             lstH.append(self.right_mult(i*order,j,1./order *Z)) # the expension of (I+i eps/f_x Y)^-1
-            Z=Z*(-1j*Y)
+            Z=Z*(-1j*g_X*Y)
         for H in lstH:
             self.add(H)
     def clean_order(self,i,j):
