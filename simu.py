@@ -79,8 +79,8 @@ class Hamiltonian():
 	
 class OnlyOne:
     """singleton, contain a dictionary with already computed simulation"""
-    pathi='res/alpha{}.dict_{}'
-    patho='res/alpha{}.dict_{}'
+    pathi='/Users/remi/Documents/Thèse/RWA/res/alpha{}.dict_{}'
+    patho='/Users/remi/Documents/Thèse/RWA/res/alpha{}.dict_{}'
     #pathi='dict_{}'.format(dt)
     #patho='dict_{}'.format(dt)
     class __OnlyOne:
@@ -91,8 +91,9 @@ class OnlyOne:
                 with open(OnlyOne.pathi.format(alpha,dt), 'rb') as fp:
                     self.val = pickle.load(fp)
                     print('opening '+OnlyOne.pathi.format(alpha,dt))
-            except IOError:
-                print('not existing file')
+            except IOError as err:
+                print('not existing file : '+OnlyOne.pathi.format(alpha,dt))
+                print(err)
                 self.val={}
     instance = None
     def __init__(self,dt,alpha):
@@ -136,7 +137,7 @@ class integrator():
         if self.use_dictio:
             sigleton_dict=OnlyOne(dt,self.alpha)
             dic=sigleton_dict.instance.val
-            if dic.has_key((np.round(eps1,decimals=6),np.round(eps2,decimals=6),self.H.dictionary_key)):
+            if (np.round(eps1,decimals=6),np.round(eps2,decimals=6),self.H.dictionary_key) in dic:
                 psi=dic[(np.round(eps1,decimals=6),np.round(eps2,decimals=6),self.H.dictionary_key)]
                 return psi
         if self.nocomputation:
@@ -187,7 +188,7 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,use_dictio=True):
                 inte=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,H,nocomputation,use_dictio)
                 psi=inte.integrate(dt,method)
                 Z[k+1][j,i]=-np.log2(np.linalg.norm(inte_R.integrate(dt,method)-inte.integrate(dt,method)))
-                print(k,inte.integrate(dt,method))
+                #print(k,inte.integrate(dt,method))
             
     #print(X,Y,Z)
     fig, axs = plt.subplots(3, 2)
@@ -231,7 +232,7 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,use_dictio=True):
 if __name__ == "__main__":
     method='dopri5'
     dt=0.01
-    alpha=0.1
+    alpha=0.0
     leps1=[i*0.5 for i in range(5*2)]
     leps2=[i*0.5 for i in range(5*2)]
     plot_err(leps1,leps2,dt,alpha,nocomputation=True,use_dictio=True)

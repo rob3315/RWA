@@ -12,8 +12,8 @@ size = comm.Get_size()
 assert size==nproc_u+1
 
 alpha=float((sys.argv[1]))
-leps1=[i*0.5 for i in range(5*2)]
-leps2=[i*0.5 for i in range(5*2)]
+leps1=[i*0.2 for i in range(7*2)]
+leps2=[i*0.2 for i in range(7*2)]
 dt=0.01
 path='alpha{}.dict_{}'.format(alpha,dt)
 l1=len(leps1)
