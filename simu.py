@@ -51,13 +51,13 @@ def get_get_RWA_H(order):
     else : raise Exception('not implemented order in get_get_RWA_H')
     def get_C(eps1,eps2,a,varphi,E,alpha,dvarphi):
         def eps(t) : return eps1*a(eps1*eps2*t)/2
-        def g_01(t) : return 1./(4E+2*alpha-dvarphi(eps1*eps2*t))
+        def g_01(t) : return 1./(4*E+2*alpha-dvarphi(eps1*eps2*t))
         def u1(t):
             return eps(t)*P1(eps(t)*g_01(t))*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
         def u2(t):
             return eps(t)*P1(eps(t)*g_01(t))*np.sin(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
         def u3(t):
-            return eps(t)*g_01(t) *P1(eps(t)*g_01(t))
+            return eps(t)**2 *g_01(t) *P1(eps(t)*g_01(t))
         return lambda t: np.array([[0,-2*(E+alpha+u3(t)),2*u2(t)],
                     [2*(E+alpha+u3(t)),0,-2*u1(t)],
                     [-2*u2(t),2*u1(t),0]])

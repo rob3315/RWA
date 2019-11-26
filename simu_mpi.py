@@ -9,7 +9,7 @@ from simu import *
 
 def compute_err(alpha,eps1,eps2,dt):
     method='dopri5'
-    order=[1,2,4,6,8]
+    order=[1,2,4]
     tocompute=[(get_get_RWA_H(o),'r{}'.format(o)) for o in order]
     tocompute.append((get_A,'r'))
     lst_psi=[]
