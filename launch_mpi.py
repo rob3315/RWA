@@ -12,8 +12,8 @@ size = comm.Get_size()
 assert size==nproc_u+1
 
 alpha=float((sys.argv[1]))
-leps1=[i*0.2 for i in range(5*5)]
-leps2=[i*0.2 for i in range(5*5)]
+leps1=[i*0.5 for i in range(5*2)]
+leps2=[i*0.5 for i in range(5*2)]
 dt=0.01
 path='alpha{}.dict_{}'.format(alpha,dt)
 l1=len(leps1)
@@ -24,9 +24,10 @@ if rank == main:
     dic={}
     for k in range(l):
         recvarray=comm.recv( source = k%nproc_u)
-        dic[(2**(-leps1[k%l1]),2**(-leps2[k//l1]),'r')]=recvarray[0]
-        dic[(2**(-leps1[k%l1]),2**(-leps2[k//l1]),'r8')]=recvarray[1]
-        dic[(2**(-leps1[k%l1]),2**(-leps2[k//l1]),'c')]=recvarray[2]
+        e1=np.round(2**(-leps1[k%l1]),decimals=6)
+        e2=np.round(2**(-leps2[k//l1]),decimals=6)
+        for elt in recvarray:
+            dic[(e1,e2,elt[0])]=elt[1]
         with open(path, 'wb') as fp:
             pickle.dump(dic,fp,protocol=2)
 else:

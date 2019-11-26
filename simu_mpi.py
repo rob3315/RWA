@@ -9,13 +9,13 @@ from simu import *
 
 def compute_err(alpha,eps1,eps2,dt):
     method='dopri5'
-    H_R=Hamiltonian(get_A,'r')
-    H_RWA=Hamiltonian(get_C,'r8')
-    H_C=Hamiltonian(get_B,'c')
-    inte_R=integrator(eps1,eps2,alpha,H_R,use_dictio=False)
-    inte_RWA=integrator(eps1,eps2,alpha,H_RWA,use_dictio=False)
-    inte_C=integrator(eps1,eps2,alpha,H_C,use_dictio=False)
-    psiR=inte_R.integrate(dt,method)
-    psiRWA=inte_RWA.integrate(dt,method)
-    psiC=inte_C.integrate(dt,method)
-    return (psiR,psiRWA,psiC)
+    order=[1,2,4,6,8]
+    tocompute=[(get_get_RWA_H(o),'r{}'.format(o)) for o in order]
+    tocompute.append((get_A,'r'))
+    lst_psi=[]
+    for elt in tocompute:
+        H=Hamiltonian(elt[0],elt[1])
+        inte=integrator(eps1,eps2,alpha,H,use_dictio=False)
+        psi=inte.integrate(dt,method)
+        lst_psi.append((elt[1],psi))
+    return (lst_psi)
