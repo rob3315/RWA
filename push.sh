@@ -1,1 +1,1 @@
-scp ./* robin@hpc2:RWA/
+scp RWA_factors.py robin@hpc2:RWA/

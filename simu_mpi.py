@@ -9,33 +9,13 @@ from simu import *
 
 def compute_err(alpha,eps1,eps2,dt):
     method='dopri5'
-    inte=integrator(eps1,eps2,alpha)
-    #real part
-    def F(t,x):
-         return np.dot(inte.A(t),x)
-    def jac(t, y):
-        return inte.A(t)
-    v0=np.array([0,0,1])
-    r = ode(F, jac).set_integrator(method)
-    r.set_initial_value(v0, 0)
-    while r.successful() and r.t < inte.tf:
-        r.integrate(min(r.t+dt,inte.tf))
-    if r.successful():
-        psiR=r.y
-    else :
-        raise Exception('simulation was not successful')
-    #complex part
-    def F(t,x):
-         return np.dot(inte.B(t),x)
-    def jac(t, y):
-        return inte.B(t)
-    v0=np.array([0,0,1])
-    r = ode(F, jac).set_integrator(method)
-    r.set_initial_value(v0, 0)
-    while r.successful() and r.t < inte.tf:
-        r.integrate(min(r.t+dt,inte.tf))
-    if r.successful():
-        psiC=r.y
-    else :
-        raise Exception('simulation was not successful')
-    return (psiR,psiC)
+    H_R=Hamiltonian(get_A,'r')
+    H_RWA=Hamiltonian(get_C,'r8')
+    H_C=Hamiltonian(get_B,'c')
+    inte_R=integrator(eps1,eps2,alpha,H_R,use_dictio=False)
+    inte_RWA=integrator(eps1,eps2,alpha,H_RWA,use_dictio=False)
+    inte_C=integrator(eps1,eps2,alpha,H_C,use_dictio=False)
+    psiR=inte_R.integrate(dt,method)
+    psiRWA=inte_RWA.integrate(dt,method)
+    psiC=inte_C.integrate(dt,method)
+    return (psiR,psiRWA,psiC)

@@ -116,7 +116,7 @@ class D(Abstract_factor):
     def shape(self):
         return lambda E: np.array([[-1j*np.exp(1j*E),0],[0,1j*np.exp(-1j*E)]])
     
-class Hamiltonian():
+class Abstract_Hamiltonian():
     
     def __init__(self,n,m):
         self.n=n
@@ -139,7 +139,7 @@ class Hamiltonian():
         return string
     
     def add(self,other):
-        assert isinstance(other,Hamiltonian) and other.n==self.n and other.m==self.m
+        assert isinstance(other,Abstract_Hamiltonian) and other.n==self.n and other.m==self.m
         for i in range(self.n):
             for j in range(self.m):
                 for ee in other.coeff[i,j]:
@@ -159,8 +159,8 @@ class Hamiltonian():
             #print('adding element'+str(elt))
     
     def add_left_mult(self,i,j,Y):
-        """add to the current hamiltonian the elt of eps_1^i eps_2^j Y H"""
-        H_new=Hamiltonian(self.n,self.m)
+        """add to the current Abstract_Hamiltonian the elt of eps_1^i eps_2^j Y H"""
+        H_new=Abstract_Hamiltonian(self.n,self.m)
         for ii in range(self.n-i):
             for jj in range(self.m-j):
                 for elt in self.coeff[ii,jj]:
@@ -168,8 +168,8 @@ class Hamiltonian():
         self.add(H_new)
     
     def right_mult(self,i,j,Y):
-        """add to the current hamiltonian the elt of eps_1^i eps_2^j H Y"""
-        H_new=Hamiltonian(self.n,self.m)
+        """add to the current Abstract_Hamiltonian the elt of eps_1^i eps_2^j H Y"""
+        H_new=Abstract_Hamiltonian(self.n,self.m)
         for ii in range(self.n-i):
             for jj in range(self.m-j):
                 for elt in self.coeff[ii,jj]:
@@ -210,7 +210,11 @@ class Hamiltonian():
             #print('cleaning term {}'.format(str(self.coeff[i,j][k])))
             self.freq_deleted.add((self.coeff[i,j][k].coef_freq[0],self.coeff[i,j][k].coef_freq[1]))
             self.apply_RWA(i,j,k)
-            
+    
+    def get_H(self,eps1,eps2,a,varphi,E,alpha,dvarphi):
+        def H(t):
+            x=E+alpha
+            y=
             
             
         
@@ -219,7 +223,7 @@ class Hamiltonian():
         
 if __name__ == "__main__":    
     n=10
-    H=Hamiltonian(n,2)
+    H=Abstract_Hamiltonian(n,2)
     H.coeff[1,0]=[A((1,0)),A((0,1))]
     print(H)
     #H.apply_RWA(1,0,1)

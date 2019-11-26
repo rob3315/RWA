@@ -23,19 +23,13 @@ def timeit(method):
         return result
     return timed
 
-def get_H(eps1,eps2,a,varphi,E,alpha):
-    """a and varphi are function from [0,2pi]-> R"""
-    def u(t):
-        return eps1*a(eps1*eps2*t)*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
-    return lambda t : np.array([[E+alpha, u(t)],[u(t),-E-alpha]],dtype=np.complex64)
-
-def get_A(eps1,eps2,a,varphi,E,alpha):
+def get_A(eps1,eps2,a,varphi,E,alpha,dvarphi):
     def u(t):
         return eps1*a(eps1*eps2*t)*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
     return lambda t: np.array([[0,-2*(E+alpha),0],
                 [2*(E+alpha),0,-2*u(t)],
                 [0,2*u(t),0]])
-def get_B(eps1,eps2,a,varphi,E,alpha):
+def get_B(eps1,eps2,a,varphi,E,alpha,dvarphi):
     def u1(t):
         return 0.5*eps1*a(eps1*eps2*t)*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
     def u2(t):
@@ -43,16 +37,33 @@ def get_B(eps1,eps2,a,varphi,E,alpha):
     return lambda t: np.array([[0,-2*(E+alpha),2*u2(t)],
                 [2*(E+alpha),0,-2*u1(t)],
                 [-2*u2(t),2*u1(t),0]])
-def get_C(eps1,eps2,a,varphi,E,alpha):
-    def beta(t):
-        return 1.#/()
+def get_C(eps1,eps2,a,varphi,E,alpha,dvarphi):
+    def eps(t) : return eps1*a(eps1*eps2*t)/2
+    def g_01(t) : return 1./dvarphi(eps1*eps2*t)
+    def P1(x): return 1-x**2 *1./2+x**4 *1./4-1./6**6#+0.125*x^8
     def u1(t):
-        return 0.5*eps1*a(eps1*eps2*t)*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
+        return eps(t)*P1(eps(t)/g_01(t))*np.cos(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
     def u2(t):
-        return 0.5*eps1*a(eps1*eps2*t)*np.sin(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
-    return lambda t: np.array([[0,-2*(E+alpha),2*u2(t)],
-                [2*(E+alpha),0,-2*u1(t)],
+        return eps(t)*P1(eps(t)/g_01(t))*np.sin(2*E*t+varphi(eps1*eps2*t)/(eps1*eps2))
+    def u3(t):
+        return eps(t)/g_01(t) *P1(eps(t)/g_01(t))
+    return lambda t: np.array([[0,-2*(E+alpha+u3(t)),2*u2(t)],
+                [2*(E+alpha+u3(t)),0,-2*u1(t)],
                 [-2*u2(t),2*u1(t),0]])
+#def get_D(eps1,eps2,a,varphi,E,alpha,dvarphi):
+#     eps_1^1eps_2^0 (1*A(1E_1+0E_2)
+#     eps_1^2eps_2^0 (1.0*I*g_01*D(0E_1+0E_2)
+#     eps_1^3eps_2^0 (-0.5*g_01**2*A(1E_1+0E_2))             
+#     eps_1^4eps_2^0 (-0.5*I*g_01**3*D(0E_1+0E_2))
+#     eps_1^5eps_2^0 (0.25*g_01**4*A(1E_1+0E_2))        
+#     eps_1^6eps_2^0 (0.25*I*g_01**5*D(0E_1+0E_2))
+#     eps_1^7eps_2^0 (-0.166666666666667*g_01**6*A(1E_1+0E_2))
+#     eps_1^8eps_2^0 (-0.166666666666667*I*g_01**7*D(0E_1+0E_2)
+#     eps_1^9eps_2^0 (0.125*g_01**8*A(1E_1+0E_2))
+class Hamiltonian():
+    def __init__(self,get_matrix,dictionary_key):
+        self.get_matrix=get_matrix
+        self.dictionary_key=dictionary_key
 	
 class OnlyOne:
     """singleton, contain a dictionary with already computed simulation"""
@@ -94,57 +105,34 @@ class OnlyOne:
             pickle.dump(OnlyOne.instance.val, handle)
 
 class integrator():
-    def __init__(self,eps1,eps2,alpha,E=1,nocomputation=False,force_computation=False):
+    def __init__(self,eps1,eps2,alpha,H,E=1,nocomputation=False,use_dictio=True):
         self.eps1=eps1
         self.eps2=eps2
         self.nocomputation=nocomputation
-        self.force_computation=force_computation
+        self.use_dictio=use_dictio
         a = lambda t : (1-np.cos(t))
-        #u2 = lambda t : -1 *np.cos(t/2)
+        dvarphi = lambda t : -1 *np.cos(t/2)
         varphi= lambda t: -2 * np.sin(t/2) # primitive of u2 such as varphi(0)=0
         self.tf = 2*np.pi/(eps1*eps2)
-        self.A=get_A(eps1,eps2,a,varphi,E,alpha)
-        self.B=get_B(eps1,eps2,a,varphi,E,alpha)
-        self.C=get_C(eps1,eps2,a,varphi,E,alpha)
-        self.H=get_H(eps1,eps2,a,varphi,E,alpha)
+        self.H=H
+        self.Ha=H.get_matrix(eps1,eps2,a,varphi,E,alpha,dvarphi)
         self.alpha=alpha
-    
-    @timeit
-    def complex_euler(self,dt,verbose=False):
-        psi0=np.array([1,0],dtype=np.complex64)
-        nbstep=(int(self.tf/dt))
-        psi=np.copy(psi0)
-        for step in range(nbstep-1):
-            psi=psi-dt*1j*np.dot(self.H(step*dt),psi)
-            psi=psi/np.linalg.norm(psi)
-            if verbose:
-                print(step,nbstep,np.abs(psi[0])**2-np.abs(psi[1])**2)
-        return psi
-    @timeit
-    def real_euler(self,dt,verbose=False):
-        psi0=np.array([0,0,1])
-        nbstep=(int(self.tf/dt))
-        psi=np.copy(psi0)
-        for step in range(nbstep-1):
-            psi=psi+dt*np.dot(self.A(step*dt),psi)
-            psi=psi/np.linalg.norm(psi)
-            if verbose:
-                print(step,nbstep,psi)
-        return psi
-    def real_RWA(self,dt,method):
+    #@timeit
+    def integrate(self,dt,method):
         eps1=self.eps1
         eps2=self.eps2
-        sigleton_dict=OnlyOne(dt,self.alpha)
-        dic=sigleton_dict.instance.val
-        if dic.has_key((eps1,eps2,'ra')) and self.force_computation==False:
-            psi=dic[(eps1,eps2,'ra')]
+        if self.use_dictio:
+            sigleton_dict=OnlyOne(dt,self.alpha)
+            dic=sigleton_dict.instance.val
+            if dic.has_key((eps1,eps2,self.H.dictionary_key)):
+                psi=dic[(eps1,eps2,self.H.dictionary_key)]
         elif self.nocomputation:
             return np.array([0,0,0])
         else:
             def F(t,x):
-                return np.dot(self.C(t),x)
+                return np.dot(self.Ha(t),x)
             def jac(t, y):
-                return self.C(t)
+                return self.Ha(t)
             v0=np.array([0,0,1])
             r = ode(F, jac).set_integrator(method)
             r.set_initial_value(v0, 0)
@@ -154,67 +142,13 @@ class integrator():
             #print(r.successful())
             if r.successful():
                 psi=r.y
-                sigleton_dict.add((eps1,eps2,'ra'),psi)
+                if self.use_dictio:
+                    sigleton_dict.add((eps1,eps2,self.H.dictionary_key),psi)
             else :
                 raise Exception('simulation was not successful')
         return psi
-    @timeit
-    def real(self,dt,method):
-        eps1=self.eps1
-        eps2=self.eps2
-        sigleton_dict=OnlyOne(dt,self.alpha)
-        dic=sigleton_dict.instance.val
-        if dic.has_key((eps1,eps2,'r')) and self.force_computation==False:
-            psi=dic[(eps1,eps2,'r')]
-        elif self.nocomputation:
-            return np.array([0,0,0])
-        else:
-            def F(t,x):
-                return np.dot(self.A(t),x)
-            def jac(t, y):
-                return self.A(t)
-            v0=np.array([0,0,1])
-            r = ode(F, jac).set_integrator(method)
-            r.set_initial_value(v0, 0)
-            while r.successful() and r.t < self.tf:
-                r.integrate(min(r.t+dt,self.tf))
-                #print(r.t, r.y)
-            #print(r.successful())
-            if r.successful():
-                psi=r.y
-                sigleton_dict.add((eps1,eps2,'r'),psi)
-            else :
-                raise Exception('simulation was not successful')
-        return psi
-    @timeit
-    def complex(self,dt,method):
-        eps1=self.eps1
-        eps2=self.eps2
-        sigleton_dict=OnlyOne(dt,self.alpha)
-        dic=sigleton_dict.instance.val
-        if dic.has_key((eps1,eps2,'c')) and self.force_computation==False:
-            psi=dic[(eps1,eps2,'c')]
-        elif self.nocomputation:
-            return np.array([0,0,0])
-        else:
-            def F(t,x):
-                return np.dot(self.B(t),x)
-            def jac(t, y):
-                return self.B(t)
-            v0=np.array([0,0,1])
-            r = ode(F, jac).set_integrator(method)
-            r.set_initial_value(v0, 0)
-            while r.successful() and r.t < self.tf:
-                r.integrate(min(r.t+dt,self.tf))
-            if r.successful():
-                psi=r.y
-                sigleton_dict.add((eps1,eps2,'c'),psi)
-            else :
-                raise Exception('simulation was not successful')
-            #print(r.t, r.y)
-        #print(r.successful())
-        return psi
-def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
+        
+def plot_err(leps1,leps2,dt,alpha,nocomputation=False,use_dictio=True):
     method='dopri5'
     X, Y = np.meshgrid(leps1, np.array(leps2))
     Z1=np.zeros(X.shape)
@@ -226,16 +160,19 @@ def plot_err(leps1,leps2,dt,alpha,nocomputation=False,force_computation=False):
     for j in range(len(leps2)-1):
         for i in range(len(leps1)-1):
             #print(2**(-leps1[i]),2**(-leps2[j]))
-            print(leps1[i],leps2[j])
-            inte=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,nocomputation=nocomputation,force_computation=force_computation)
-            print(inte.complex(dt,method))
-            Z1[j,i]=-np.log2(1+inte.complex(dt,method)[2])# wierd convention
-            Z2[j,i]=-np.log2(np.abs(inte.complex(dt,method)[2]-inte.real(dt,method))[2])# wierd convention
+            H_R=Hamiltonian(get_A,'r')
+            H_RWA=Hamiltonian(get_C,'r8')
+            H_C=Hamiltonian(get_B,'c')
+            inte_R=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,H_R,nocomputation=nocomputation,use_dictio=use_dictio)
+            inte_RWA=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,H_RWA,nocomputation=nocomputation,use_dictio=use_dictio)
+            inte_C=integrator(2**(-leps1[i]),2**(-leps2[j]),alpha,H_C,nocomputation=nocomputation,use_dictio=use_dictio)
+            Z1[j,i]=-np.log2(1+inte_R.integrate(dt,method)[2])# wierd convention
+            Z2[j,i]=-np.log2(np.linalg.norm(inte_R.integrate(dt,method)-inte_RWA.integrate(dt,method)))# wierd convention
             #Z2[j,i]=-np.log2(np.linalg.norm(inte.complex(dt,method)-inte.real(dt,method)))# wierd convention
-            Z3[j,i]=-np.log2(1+inte.real(dt,method)[2])
-            Z6[j,i]=-np.log2(np.abs(1-np.linalg.norm(inte.complex(dt,method)))+np.abs(1-np.linalg.norm(inte.real(dt,method))))
-            Z4[j,i]=0 if (i==0 and j==0)else -np.log2(1+inte.real(dt,method)[2])/(leps1[i]+leps2[j])
-            Z5[j,i]=0 if (i==0 and j==0)else -np.log2(1+inte.complex(dt,method)[2])/(leps1[i]+leps2[j])
+            Z3[j,i]=-np.log2(1+inte_R.integrate(dt,method)[2])
+            Z4[j,i]=0 if (i==0 and j==0)else -np.log2(1+inte_R.integrate(dt,method)[2])/(leps1[i]+leps2[j])
+            Z5[j,i]=0 if (i==0 and j==0)else -np.log2(1+inte_RWA.integrate(dt,method)[2])/(leps1[i]+leps2[j])
+            Z6[j,i]=-np.log2(np.abs(1-np.linalg.norm(inte_RWA.integrate(dt,method)))+np.abs(1-np.linalg.norm(inte_R.integrate(dt,method))))
     #print(X,Y,Z)
     fig, axs = plt.subplots(3, 2)
     z_min=0
